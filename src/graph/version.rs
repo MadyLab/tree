@@ -1,4 +1,4 @@
-use std::cmp::Ordering;
+use std::{cmp::Ordering, rc::Rc, cell::RefCell};
 
 use smallvec::SmallVec;
 
@@ -28,7 +28,7 @@ impl VersionGuard {
     }
 }
 
-#[derive(PartialEq, Eq, Ord,Clone)]
+#[derive(PartialEq, Eq, Ord, Clone)]
 pub struct Version<'a> {
     sfx: usize,
     pfx: &'a SmallVec<[usize; 8]>,
@@ -55,13 +55,51 @@ impl<'a> PartialOrd for Version<'a> {
 }
 
 impl<'a> Version<'a> {
-    pub fn fork(&self,guard:& mut VersionGuard) -> VersionGuard {
-        let next=guard.next();
-        let mut padding=next.pfx.clone();
+    pub fn fork(&self, guard: &mut VersionGuard) -> VersionGuard {
+        let next = guard.next();
+        let mut padding = next.pfx.clone();
         padding.push(next.sfx);
         VersionGuard {
             pfx: padding,
             counter: 0,
+        }
+    }
+}
+
+fn MSB(mut i: usize) -> usize {
+    debug_assert_ne!(i, 1, "0 is invaild in MSB");
+    let mut o = 1;
+    while i != 1 {
+        i = i >> 1;
+        o += 1;
+    }
+    o
+}
+
+#[derive(Clone)]
+struct VersionNode {
+    parents: RefCell<Vec<Rc<VersionNode>>>,
+    depth: usize,
+}
+
+impl VersionNode {
+    fn fork(self:Rc<VersionNode>)->Rc<VersionNode>{
+        Rc::new(VersionNode{
+            depth:self.depth+1,
+            parents:RefCell::new(vec![self])
+        })
+    }
+    fn get_parents(&self, step: usize) -> Rc<VersionNode> {
+        if step == 0 {
+            return Rc::new(self.clone());
+        } else {
+            let msb = MSB(step);
+
+            let mut parents=self.parents.borrow_mut();
+            let result=parents[msb].get_parents(step-(1<<(msb-1)));
+            parents[msb]=result.clone();
+
+            result
         }
     }
 }
