@@ -1,25 +1,19 @@
-// use std::rc::Rc;
+use std::rc::{Rc, Weak};
 
-// use super::{arena::Arena, version::Version};
+use super::{version::Version};
 
-// #[derive(Clone)]
-// struct DataNode<T> {
-//     data: Rc<T>,
-// }
+#[derive(Clone)]
+struct Node<E, N> {
+    data: Rc<N>,
+    parent:*const Edge<E, N>,
+    edges: Vec<*const Edge<E, N>>,
+} 
 
-// #[derive(Clone)]
-// struct Node<'a, E, N> {
-//     data: DataNode<N>,
-//     edges: Vec<Edge<'a, E, N>>,
-// }
+#[derive(Clone)]
+struct Edge< E, N> {
+    data: Rc<E>,
+    version: Version<Self>,
+    parent:*const Node<E,N>,
+    child: *const Node<E,N>,
+}
 
-// #[derive(Clone)]
-// struct Edge<'a, E, N> {
-//     data: DataNode<E>,
-//     version: Version<'a>,
-//     node: Node<'a, E, N>,
-// }
-
-// struct GraphGuard<'a, E, N> {
-//     arena: Arena<Node<'a, E, N>>,
-// }
