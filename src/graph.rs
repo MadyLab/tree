@@ -47,23 +47,49 @@ impl<E, N> Node<E, N> {
             version: b,
         }
     }
-    // pub fn parents(&self) -> impl Iterator + '_ {
-    //     self.raw
-    //         .edges
-    //         .iter()
-    //         .filter(|edge| edge.upgrade().is_some())
-    //         .filter_map(|edge| {
-    //             let edge = edge.upgrade().unwrap();
-    //             let version = edge.version.upgrade().unwrap();
-    //             if self.version.is_derivative_of(&version) && Rc::ptr_eq(&edge.child, &self.raw) {
-    //                 Some((edge.data.clone(), edge.parent.clone()))
-    //             } else {
-    //                 None
-    //             }
-    //         })
-    // }
+    pub fn parent(&self) -> ParentsIterator<'_, E, N> {
+        ParentsIterator { node: &self, i: 0 }
+    }
     pub fn children(&self) -> ChildrenIterator<'_, E, N> {
         ChildrenIterator { node: &self, i: 0 }
+    }
+}
+
+#[derive(Debug)]
+pub struct ParentsIterator<'a, E, N> {
+    node: &'a Node<E, N>,
+    i: usize,
+}
+
+impl<'a, E, N> Iterator for ParentsIterator<'a, E, N> {
+    type Item = (Rc<E>, Node<E, N>);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let version = &self.node.version;
+        let edges = self.node.raw.edges.borrow();
+        while self.i < edges.len() {
+            let edge = &edges[self.i];
+            self.i += 1;
+
+            if let None = edge.upgrade() {
+                continue;
+            }
+
+            let edge = edge.upgrade().unwrap();
+            if !version.is_derivative_of(&edge.version.upgrade().unwrap()) {
+                continue;
+            }
+            if !Rc::ptr_eq(&self.node.raw,&edge.child){
+                continue;
+            }
+
+            let node = Node {
+                version: version.clone(),
+                raw: edge.child.clone(),
+            };
+            return Some((edge.data.clone(), node));
+        }
+        None
     }
 }
 
@@ -89,7 +115,9 @@ impl<'a, E, N> Iterator for ChildrenIterator<'a, E, N> {
 
             let edge = edge.upgrade().unwrap();
             if !version.is_derivative_of(&edge.version.upgrade().unwrap()) {
-                println!("2");
+                continue;
+            }
+            if !Rc::ptr_eq(&self.node.raw,&edge.parent){
                 continue;
             }
 
