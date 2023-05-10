@@ -1,89 +1,72 @@
-use std::{cell::RefCell, rc::{Rc, Weak}};
+use std::{
+    borrow::BorrowMut,
+    cell::RefCell,
+    collections::{BTreeMap, HashMap},
+    rc::{Rc, Weak},
+};
 
-#[derive(Clone,Default)]
 pub struct Version<T> {
-    major: Rc<Node<T>>,
-    sub: usize,
+    cache: RefCell<HashMap<*const Version<T>, bool>>,
+    parents: RefCell<Vec<Rc<Version<T>>>>,
+    garbage: RefCell<Vec<Rc<T>>>,
+}
+
+impl<T> Clone for Version<T> {
+    fn clone(&self) -> Self {
+        Self {
+            cache: self.cache.clone(),
+            parents: self.parents.clone(),
+            garbage: self.garbage.clone(),
+        }
+    }
+}
+
+impl<T> Default for Version<T> {
+    fn default() -> Self {
+        Self {
+            cache: Default::default(),
+            parents: Default::default(),
+            garbage: Default::default(),
+        }
+    }
 }
 
 impl<T> Version<T> {
-    pub fn derive(&self) -> Version<T> {
-        Version {
-            major: self.major.clone(),
-            sub: self.sub + 1,
-        }
+    pub fn merge(self: &Rc<Version<T>>, base: &Rc<Version<T>>) {
+        self.parents.borrow_mut().push(base.clone());
     }
-    pub fn fork(&self) -> Version<T> {
-        Version {
-            major: Rc::new(Node {
-                parents: RefCell::new(vec![self.major.clone()]),
-                depth: self.major.depth + 1,
-                garbage: Default::default(),
-            }),
-            sub: 0,
-        }
+    pub fn fork(self: &Rc<Version<T>>) -> (Rc<Version<T>>, Rc<Version<T>>) {
+        (self.derive(), self.derive())
     }
-    pub fn is_derivative_of(&self, other: Version<T>) -> bool {
-        if Rc::ptr_eq(&self.major, &other.major) {
-            other.sub <= self.sub
-        } else {
-            self.is_fork_of(other)
-        }
-    }
-    pub unsafe fn migrate(&self, garbage: Box<T>) -> *const T {
-        let result: *const T = &*garbage;
-        self.major.garbage.borrow_mut().push(garbage);
+    pub unsafe fn migrate(self: &Version<T>, garbage: T) -> Weak<T> {
+        let garbage = Rc::new(garbage);
+        let result = Rc::<T>::downgrade(&garbage);
+        self.garbage.borrow_mut().push(garbage);
         result
     }
-    fn is_fork_of(&self, other: Version<T>) -> bool {
-        if other.major.depth < self.major.depth {
-            false
-        } else {
-            Rc::ptr_eq(
-                &other.major,
-                &self
-                    .major
-                    .clone()
-                    .get_parents(other.major.depth - self.major.depth),
-            )
+    pub fn is_derivative_of(self: &Rc<Version<T>>, other: &Rc<Version<T>>) -> bool {
+        let other_ptr = Rc::<Version<T>>::as_ptr(&other);
+        let mut cache = self.cache.borrow_mut();
+
+        if let Some(a) = cache.get(&other_ptr) {
+            return *a;
+        } else if Rc::ptr_eq(self, other) {
+            return true;
         }
-    }
-}
-
-pub struct WeakVersion<T>{
-    major: Weak<Node<T>>,
-    sub: usize,
-}
-
-fn msb(mut i: usize) -> usize {
-    debug_assert_ne!(i, 1, "0 is invaild in MSB");
-    let mut o = 1;
-    while i != 1 {
-        i = i >> 1;
-        o += 1;
-    }
-    o
-}
-
-#[derive(Clone,Default)]
-struct Node<T> {
-    parents: RefCell<Vec<Rc<Node<T>>>>,
-    depth: usize,
-    garbage: RefCell<Vec<Box<T>>>,
-}
-
-impl<T> Node<T> {
-    fn get_parents(self: Rc<Node<T>>, step: usize) -> Rc<Node<T>> {
-        if step == 0 {
-            return self.clone();
-        } else {
-            let msb = msb(step);
-
-            let mut parents = self.parents.borrow_mut();
-            let result = parents[msb].clone().get_parents(step - (1 << (msb - 1)));
-            parents[msb] = result.clone();
-
-            result
+        for parent in &*self.parents.borrow() {
+            if !Rc::ptr_eq(parent, self) && parent.is_derivative_of(other) {
+                cache.insert(other_ptr, true);
+                return true;
+            }
         }
+        cache.insert(other_ptr, false);
+        return false;
+    }
+    pub fn derive(self: &Rc<Version<T>>) -> Rc<Version<T>> {
+        Rc::new(Version {
+            cache: Default::default(),
+            parents: RefCell::new(vec![self.clone()]),
+            garbage: Default::default(),
+        })
     }
 }
