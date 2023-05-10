@@ -26,7 +26,8 @@ impl<E, N> Node<E, N> {
             child: child.raw.clone(),
             version: Rc::downgrade(&child.version),
         };
-        unsafe { child.version.migrate(edge) };
+        let edge=unsafe { child.version.migrate(edge) };
+        self.raw.edges.push(edge);
     }
     pub fn get(&self) -> &N {
         &self.raw.data
@@ -60,7 +61,7 @@ impl<E, N> Node<E, N> {
                 }
             })
     }
-    pub fn children(&self) -> impl Iterator + '_ {
+    pub fn children(&self) -> impl Iterator<Item = (Rc<E>, Node<E, N>)> + '_ {
         self.raw
             .edges
             .iter()
@@ -69,7 +70,11 @@ impl<E, N> Node<E, N> {
                 let edge = edge.upgrade().unwrap();
                 let version = edge.version.upgrade().unwrap();
                 if self.version.is_derivative_of(&version) && Rc::ptr_eq(&edge.parent, &self.raw) {
-                    Some((edge.data.clone(), edge.parent.clone()))
+                    let node = Node {
+                        version: self.version.clone(),
+                        raw: edge.parent.clone(),
+                    };
+                    Some((edge.data.clone(), node))
                 } else {
                     None
                 }
