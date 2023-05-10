@@ -4,9 +4,10 @@ use std::{
     rc::{Rc, Weak},
 };
 
+#[derive(Debug)]
 pub struct Version<T> {
     cache: RefCell<HashMap<*const Version<T>, bool>>,
-    parents: RefCell<Vec<Rc<Version<T>>>>,
+    parents: Vec<Rc<Version<T>>>,
     garbage: RefCell<Vec<Rc<T>>>,
 }
 
@@ -31,8 +32,10 @@ impl<T> Default for Version<T> {
 }
 
 impl<T> Version<T> {
-    pub fn merge(self: &Rc<Version<T>>, base: &Rc<Version<T>>) {
-        self.parents.borrow_mut().push(base.clone());
+    pub fn merge(self: &Rc<Version<T>>, base: &Rc<Version<T>>) ->Version<T>{
+        let mut version=Version::default();
+        version.parents=vec![self.clone(),base.clone()];
+        version
     }
     pub fn fork(self: &Rc<Version<T>>) -> (Rc<Version<T>>, Rc<Version<T>>) {
         (self.derive(), self.derive())
@@ -52,7 +55,7 @@ impl<T> Version<T> {
         } else if Rc::ptr_eq(self, other) {
             return true;
         }
-        for parent in &*self.parents.borrow() {
+        for parent in &*self.parents {
             if !Rc::ptr_eq(parent, self) && parent.is_derivative_of(other) {
                 cache.insert(other_ptr, true);
                 return true;
@@ -64,7 +67,7 @@ impl<T> Version<T> {
     pub fn derive(self: &Rc<Version<T>>) -> Rc<Version<T>> {
         Rc::new(Version {
             cache: Default::default(),
-            parents: RefCell::new(vec![self.clone()]),
+            parents: vec![self.clone()],
             garbage: Default::default(),
         })
     }

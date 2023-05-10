@@ -1,11 +1,15 @@
-use std::rc::{Rc, Weak};
+use std::{
+    cell::RefCell,
+    rc::{Rc, Weak},
+};
 
 use super::version::Version;
 
 type RcNode<E, N> = Rc<RawNode<E, N>>;
 type WeakNode<E, N> = Weak<RawNode<E, N>>;
 
-// prevent RawNode(the holding one), Version from being drop
+/// Node handle
+#[derive(Debug)]
 pub struct Node<E, N> {
     version: Rc<Version<Edge<E, N>>>,
     raw: Rc<RawNode<E, N>>,
@@ -19,84 +23,102 @@ impl<E, N> Node<E, N> {
         }
     }
     pub fn add_child(&mut self, child: &mut Node<E, N>, value: E) {
-        child.version.merge(&self.version);
+        self.version=Rc::new(child.version.merge(&self.version));
         let edge = Edge {
             data: Rc::new(value),
             parent: self.raw.clone(),
             child: child.raw.clone(),
-            version: Rc::downgrade(&child.version),
+            version: Rc::downgrade(&self.version),
         };
-        let edge=unsafe { child.version.migrate(edge) };
-        self.raw.edges.push(edge);
+        let edge = unsafe { child.version.migrate(edge) };
+        self.raw.edges.borrow_mut().push(edge);
     }
     pub fn get(&self) -> &N {
         &self.raw.data
-    }
-    pub fn set(&mut self, data: N) {
-        self.raw = Rc::new(RawNode {
-            data: Rc::new(data),
-            edges: self.raw.edges.clone(),
-        });
     }
     pub fn clone(&mut self) -> Self {
         let (a, b) = self.version.fork();
         self.version = a;
         Self {
-            raw: self.raw.clone(),
+            raw: Rc::new(RawNode {
+                data: self.raw.data.clone(),
+                edges: self.raw.edges.clone(),
+            }),
             version: b,
         }
     }
-    pub fn parents(&self) -> impl Iterator + '_ {
-        self.raw
-            .edges
-            .iter()
-            .filter(|edge| edge.upgrade().is_some())
-            .filter_map(|edge| {
-                let edge = edge.upgrade().unwrap();
-                let version = edge.version.upgrade().unwrap();
-                if self.version.is_derivative_of(&version) && Rc::ptr_eq(&edge.child, &self.raw) {
-                    Some((edge.data.clone(), edge.parent.clone()))
-                } else {
-                    None
-                }
-            })
-    }
-    pub fn children(&self) -> impl Iterator<Item = (Rc<E>, Node<E, N>)> + '_ {
-        self.raw
-            .edges
-            .iter()
-            .filter(|edge| edge.upgrade().is_some())
-            .filter_map(|edge| {
-                let edge = edge.upgrade().unwrap();
-                let version = edge.version.upgrade().unwrap();
-                if self.version.is_derivative_of(&version) && Rc::ptr_eq(&edge.parent, &self.raw) {
-                    let node = Node {
-                        version: self.version.clone(),
-                        raw: edge.parent.clone(),
-                    };
-                    Some((edge.data.clone(), node))
-                } else {
-                    None
-                }
-            })
+    // pub fn parents(&self) -> impl Iterator + '_ {
+    //     self.raw
+    //         .edges
+    //         .iter()
+    //         .filter(|edge| edge.upgrade().is_some())
+    //         .filter_map(|edge| {
+    //             let edge = edge.upgrade().unwrap();
+    //             let version = edge.version.upgrade().unwrap();
+    //             if self.version.is_derivative_of(&version) && Rc::ptr_eq(&edge.child, &self.raw) {
+    //                 Some((edge.data.clone(), edge.parent.clone()))
+    //             } else {
+    //                 None
+    //             }
+    //         })
+    // }
+    pub fn children(&self) -> ChildrenIterator<'_, E, N> {
+        ChildrenIterator { node: &self, i: 0 }
     }
 }
 
+#[derive(Debug)]
+pub struct ChildrenIterator<'a, E, N> {
+    node: &'a Node<E, N>,
+    i: usize,
+}
+
+impl<'a, E, N> Iterator for ChildrenIterator<'a, E, N> {
+    type Item = (Rc<E>, Node<E, N>);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let version = &self.node.version;
+        let edges = self.node.raw.edges.borrow();
+        while self.i < edges.len() {
+            let edge = &edges[self.i];
+            self.i += 1;
+
+            if let None = edge.upgrade() {
+                continue;
+            }
+
+            let edge = edge.upgrade().unwrap();
+            if !version.is_derivative_of(&edge.version.upgrade().unwrap()) {
+                println!("2");
+                continue;
+            }
+
+            let node = Node {
+                version: version.clone(),
+                raw: edge.parent.clone(),
+            };
+            return Some((edge.data.clone(), node));
+        }
+        None
+    }
+}
+
+#[derive(Debug)]
 struct RawNode<E, N> {
-    data: Rc<N>,
-    edges: Vec<Weak<Edge<E, N>>>,
+    data: Rc<N>,                           // immutable
+    edges: RefCell<Vec<Weak<Edge<E, N>>>>, // mutable
 }
 
 impl<E, N> RawNode<E, N> {
     fn new(data: N) -> Rc<Self> {
         Rc::new(Self {
             data: Rc::new(data),
-            edges: Vec::new(),
+            edges: Default::default(),
         })
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone,Debug)]
 struct Edge<E, N> {
     data: Rc<E>,
     parent: Rc<RawNode<E, N>>,

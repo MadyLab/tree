@@ -11,7 +11,6 @@ fn main() {
 
     let result: Vec<&str> = node1.children().map(|(edge, _)| (*edge).clone()).collect();
 
-    dbg!(&result);
     assert!(result.contains(&"e1 2"));
     assert!(result.contains(&"e1 3"));
 }
