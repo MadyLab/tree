@@ -1,3 +1,37 @@
+macro_rules! check_children {
+    ($c:expr,$edge:expr,$node:expr) => {
+        let result: Vec<(&str, &str)> = $c
+            .children()
+            .map(|(edge, node)| ((*edge).clone(), node.get().clone()))
+            .collect();
+        assert!(result.contains(&($edge, $node)));
+    };
+    ($c:expr,$len:expr) => {
+        let result: Vec<(&str, &str)> = $c
+            .children()
+            .map(|(edge, node)| ((*edge).clone(), node.get().clone()))
+            .collect();
+        assert!(result.len() == $len);
+    };
+}
+
+macro_rules! check_parents {
+    ($c:expr,$edge:expr,$node:expr) => {
+        let result: Vec<(&str, &str)> = $c
+            .parents()
+            .map(|(edge, node)| ((*edge).clone(), node.get().clone()))
+            .collect();
+        assert!(result.contains(&($edge, $node)));
+    };
+    ($c:expr,$len:expr) => {
+        let result: Vec<(&str, &str)> = $c
+            .parents()
+            .map(|(edge, node)| ((*edge).clone(), node.get().clone()))
+            .collect();
+        assert!(result.len() == $len);
+    };
+}
+
 use btr_async::prelude::*;
 #[cfg(test)]
 #[test]
@@ -9,40 +43,17 @@ fn main() {
     node1.add_child(&mut node2, "e1 2");
     node1.add_child(&mut node3, "e1 3");
 
-    let result: Vec<(&str, &str)> = node1
-        .children()
-        .map(|(edge, node)| ((*edge).clone(), node.get().clone()))
-        .collect();
-    assert!(result.contains(&("e1 2", "n2")));
-    assert!(result.contains(&("e1 3", "n3")));
+    node1.optimize();
+    check_children!(node1, "e1 2", "n2");
+    check_children!(node1, "e1 3", "n3");
+    check_children!(node1, 2);
+    check_parents!(node1, 0);
 
-    let result: Vec<(&str, &str)> = node1
-        .parents()
-        .map(|(edge, node)| ((*edge).clone(), node.get().clone()))
-        .collect();
-    assert!(result.len() == 0);
+    check_children!(node2, 0);
+    check_parents!(node2, "e1 2", "n1");
+    check_parents!(node2, 1);
 
-    let result: Vec<(&str, &str)> = node2
-        .children()
-        .map(|(edge, node)| ((*edge).clone(), node.get().clone()))
-        .collect();
-    assert!(result.len() == 0);
-
-    let result: Vec<(&str, &str)> = node2
-        .parents()
-        .map(|(edge, node)| ((*edge).clone(), node.get().clone()))
-        .collect();
-    assert!(result.contains(&("e1 2", "n1")));
-
-    let result: Vec<(&str, &str)> = node3
-        .children()
-        .map(|(edge, node)| ((*edge).clone(), node.get().clone()))
-        .collect();
-    assert!(result.len() == 0);
-
-    let result: Vec<(&str, &str)> = node3
-        .parents()
-        .map(|(edge, node)| ((*edge).clone(), node.get().clone()))
-        .collect();
-    assert!(result.contains(&("e1 3", "n1")));
+    check_children!(node3, 0);
+    check_parents!(node3, "e1 3", "n1");
+    check_parents!(node3, 1);
 }

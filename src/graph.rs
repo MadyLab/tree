@@ -5,9 +5,6 @@ use std::{
 
 use super::version::Version;
 
-type RcNode<E, N> = Rc<RawNode<E, N>>;
-type WeakNode<E, N> = Weak<RawNode<E, N>>;
-
 /// Node handle
 #[derive(Debug)]
 pub struct Node<E, N> {
@@ -21,6 +18,9 @@ impl<E, N> Node<E, N> {
             version: Default::default(),
             raw: RawNode::new(data),
         }
+    }
+    pub fn optimize(&mut self){
+        self.version=self.version.optimize();
     }
     pub fn add_child(&mut self, child: &mut Node<E, N>, value: E) {
         self.version = Rc::new(child.version.merge(&self.version));
@@ -39,14 +39,12 @@ impl<E, N> Node<E, N> {
         &self.raw.data
     }
     pub fn clone(&mut self) -> Self {
-        let (a, b) = self.version.fork();
-        self.version = a;
         Self {
             raw: Rc::new(RawNode {
                 data: self.raw.data.clone(),
                 edges: self.raw.edges.clone(),
             }),
-            version: b,
+            version: self.version.derive(),
         }
     }
     pub fn parents(&self) -> ParentsIterator<'_, E, N> {

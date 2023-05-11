@@ -1,12 +1,12 @@
 use std::{
     cell::RefCell,
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     rc::{Rc, Weak},
 };
 
 #[derive(Debug)]
 pub struct Version<T> {
-    cache: RefCell<HashMap<*const Version<T>, bool>>,
+    cache: Option<HashSet<*const Version<T>>>,
     parents: Vec<Rc<Version<T>>>,
     garbage: RefCell<Vec<Rc<T>>>,
 }
@@ -14,7 +14,7 @@ pub struct Version<T> {
 impl<T> Clone for Version<T> {
     fn clone(&self) -> Self {
         Self {
-            cache: self.cache.clone(),
+            cache:Default::default(),
             parents: self.parents.clone(),
             garbage: self.garbage.clone(),
         }
@@ -24,7 +24,7 @@ impl<T> Clone for Version<T> {
 impl<T> Default for Version<T> {
     fn default() -> Self {
         Self {
-            cache: Default::default(),
+            cache:Default::default(),
             parents: Default::default(),
             garbage: Default::default(),
         }
@@ -37,36 +37,47 @@ impl<T> Version<T> {
         version.parents = vec![self.clone(), base.clone()];
         version
     }
-    pub fn fork(self: &Rc<Version<T>>) -> (Rc<Version<T>>, Rc<Version<T>>) {
-        (self.derive(), self.derive())
-    }
     pub unsafe fn migrate(self: &Version<T>, garbage: T) -> Weak<T> {
         let garbage = Rc::new(garbage);
         let result = Rc::<T>::downgrade(&garbage);
         self.garbage.borrow_mut().push(garbage);
         result
     }
+    pub fn optimize(self: &Rc<Version<T>>)->Rc<Version<T>>{
+        let mut cache=HashSet::new();
+        let mut stack=vec![self];
+        loop{
+            if let Some(item)=stack.pop(){
+                let ptr=Rc::as_ptr(item);
+                if !cache.contains(&ptr){
+                    cache.insert(ptr);
+                    for parent in &item.parents{
+                        stack.push(&parent)
+                    }
+                }
+            }else{
+                break;
+            }
+        }
+        Rc::new(Version{ cache:Some(cache), parents: self.parents.clone(), garbage: self.garbage.clone() })
+    }
     pub fn is_derivative_of(self: &Rc<Version<T>>, other: &Rc<Version<T>>) -> bool {
-        let other_ptr = Rc::<Version<T>>::as_ptr(&other);
-        let mut cache = self.cache.borrow_mut();
-
-        if let Some(a) = cache.get(&other_ptr) {
-            return *a;
-        } else if Rc::ptr_eq(self, other) {
+        if let Some(cache)=&self.cache{
+            return cache.contains(&Rc::as_ptr(&other));
+        }
+        if Rc::ptr_eq(self, other) {
             return true;
         }
         for parent in &*self.parents {
             if parent.is_derivative_of(other) {
-                cache.insert(other_ptr, true);
                 return true;
             }
         }
-        cache.insert(other_ptr, false);
         return false;
     }
     pub fn derive(self: &Rc<Version<T>>) -> Rc<Version<T>> {
         Rc::new(Version {
-            cache: Default::default(),
+            cache:Default::default(),
             parents: vec![self.clone()],
             garbage: Default::default(),
         })
