@@ -24,6 +24,7 @@ impl<E, N> Node<E, N> {
     }
     pub fn add_child(&mut self, child: &mut Node<E, N>, value: E) {
         self.version = Rc::new(child.version.merge(&self.version));
+        child.version = self.version.clone();
         let edge = Edge {
             data: Rc::new(value),
             parent: self.raw.clone(),
@@ -31,7 +32,8 @@ impl<E, N> Node<E, N> {
             version: Rc::downgrade(&self.version),
         };
         let edge = unsafe { child.version.migrate(edge) };
-        self.raw.edges.borrow_mut().push(edge);
+        self.raw.edges.borrow_mut().push(edge.clone());
+        child.raw.edges.borrow_mut().push(edge);
     }
     pub fn get(&self) -> &N {
         &self.raw.data
@@ -47,7 +49,7 @@ impl<E, N> Node<E, N> {
             version: b,
         }
     }
-    pub fn parent(&self) -> ParentsIterator<'_, E, N> {
+    pub fn parents(&self) -> ParentsIterator<'_, E, N> {
         ParentsIterator { node: &self, i: 0 }
     }
     pub fn children(&self) -> ChildrenIterator<'_, E, N> {
@@ -85,7 +87,7 @@ impl<'a, E, N> Iterator for ParentsIterator<'a, E, N> {
 
             let node = Node {
                 version: version.clone(),
-                raw: edge.child.clone(),
+                raw: edge.parent.clone(),
             };
             return Some((edge.data.clone(), node));
         }
@@ -123,7 +125,7 @@ impl<'a, E, N> Iterator for ChildrenIterator<'a, E, N> {
 
             let node = Node {
                 version: version.clone(),
-                raw: edge.parent.clone(),
+                raw: edge.child.clone(),
             };
             return Some((edge.data.clone(), node));
         }

@@ -9,8 +9,40 @@ fn main() {
     node1.add_child(&mut node2, "e1 2");
     node1.add_child(&mut node3, "e1 3");
 
-    let result: Vec<&str> = node1.children().map(|(edge, _)| (*edge).clone()).collect();
+    let result: Vec<(&str, &str)> = node1
+        .children()
+        .map(|(edge, node)| ((*edge).clone(), node.get().clone()))
+        .collect();
+    assert!(result.contains(&("e1 2", "n2")));
+    assert!(result.contains(&("e1 3", "n3")));
 
-    assert!(result.contains(&"e1 2"));
-    assert!(result.contains(&"e1 3"));
+    let result: Vec<(&str, &str)> = node1
+        .parents()
+        .map(|(edge, node)| ((*edge).clone(), node.get().clone()))
+        .collect();
+    assert!(result.len() == 0);
+
+    let result: Vec<(&str, &str)> = node2
+        .children()
+        .map(|(edge, node)| ((*edge).clone(), node.get().clone()))
+        .collect();
+    assert!(result.len() == 0);
+
+    let result: Vec<(&str, &str)> = node2
+        .parents()
+        .map(|(edge, node)| ((*edge).clone(), node.get().clone()))
+        .collect();
+    assert!(result.contains(&("e1 2", "n1")));
+
+    let result: Vec<(&str, &str)> = node3
+        .children()
+        .map(|(edge, node)| ((*edge).clone(), node.get().clone()))
+        .collect();
+    assert!(result.len() == 0);
+
+    let result: Vec<(&str, &str)> = node3
+        .parents()
+        .map(|(edge, node)| ((*edge).clone(), node.get().clone()))
+        .collect();
+    assert!(result.contains(&("e1 3", "n1")));
 }
