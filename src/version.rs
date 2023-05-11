@@ -32,9 +32,9 @@ impl<T> Default for Version<T> {
 }
 
 impl<T> Version<T> {
-    pub fn merge(self: &Rc<Version<T>>, base: &Rc<Version<T>>) ->Version<T>{
-        let mut version=Version::default();
-        version.parents=vec![self.clone(),base.clone()];
+    pub fn merge(self: &Rc<Version<T>>, base: &Rc<Version<T>>) -> Version<T> {
+        let mut version = Version::default();
+        version.parents = vec![self.clone(), base.clone()];
         version
     }
     pub fn fork(self: &Rc<Version<T>>) -> (Rc<Version<T>>, Rc<Version<T>>) {
@@ -56,7 +56,7 @@ impl<T> Version<T> {
             return true;
         }
         for parent in &*self.parents {
-            if !Rc::ptr_eq(parent, self) && parent.is_derivative_of(other) {
+            if parent.is_derivative_of(other) {
                 cache.insert(other_ptr, true);
                 return true;
             }

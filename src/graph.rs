@@ -23,7 +23,7 @@ impl<E, N> Node<E, N> {
         }
     }
     pub fn add_child(&mut self, child: &mut Node<E, N>, value: E) {
-        self.version=Rc::new(child.version.merge(&self.version));
+        self.version = Rc::new(child.version.merge(&self.version));
         let edge = Edge {
             data: Rc::new(value),
             parent: self.raw.clone(),
@@ -79,7 +79,7 @@ impl<'a, E, N> Iterator for ParentsIterator<'a, E, N> {
             if !version.is_derivative_of(&edge.version.upgrade().unwrap()) {
                 continue;
             }
-            if !Rc::ptr_eq(&self.node.raw,&edge.child){
+            if !Rc::ptr_eq(&self.node.raw, &edge.child) {
                 continue;
             }
 
@@ -117,7 +117,7 @@ impl<'a, E, N> Iterator for ChildrenIterator<'a, E, N> {
             if !version.is_derivative_of(&edge.version.upgrade().unwrap()) {
                 continue;
             }
-            if !Rc::ptr_eq(&self.node.raw,&edge.parent){
+            if !Rc::ptr_eq(&self.node.raw, &edge.parent) {
                 continue;
             }
 
@@ -146,7 +146,7 @@ impl<E, N> RawNode<E, N> {
     }
 }
 
-#[derive(Clone,Debug)]
+#[derive(Clone, Debug)]
 struct Edge<E, N> {
     data: Rc<E>,
     parent: Rc<RawNode<E, N>>,
