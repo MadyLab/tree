@@ -32,7 +32,7 @@ macro_rules! check_parents {
     };
 }
 
-use btr_async::prelude::*;
+use tree::prelude::*;
 #[cfg(test)]
 #[test]
 fn main() {

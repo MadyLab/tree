@@ -3,14 +3,6 @@
 version = 3
 
 [[package]]
-name = "btr-async"
-version = "0.1.0"
-dependencies = [
- "lazy_static",
- "smallvec",
-]
-
-[[package]]
 name = "lazy_static"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -21,3 +13,11 @@ name = "smallvec"
 version = "1.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a507befe795404456341dfab10cef66ead4c041f62b8b11bbb92bffe5d0953e0"
+
+[[package]]
+name = "tree"
+version = "0.1.0"
+dependencies = [
+ "lazy_static",
+ "smallvec",
+]
