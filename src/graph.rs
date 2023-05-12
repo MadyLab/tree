@@ -7,7 +7,7 @@ use super::version::Version;
 
 /// A Node in Directed Acyclic Graph
 ///
-/// Being cyclic would make all participated ``rawNode`` visible to other, which make clone meaningsless
+/// Being cyclic would make all participated ``rawNode`` visible to other, which make clone meaningless
 ///
 /// First generic: Edge value
 ///
@@ -31,7 +31,7 @@ impl<E, N> Node<E, N> {
     /// Synchronize Node's ``Version`` with other
     /// 
     /// Also of note that the ``Version`` here is different from that of ``RawNode``,
-    /// so changing ``Node``'s ``Version`` won't change how the underlying graph.
+    /// so changing ``Node``'s ``Version`` won't change underlying graph.
     /// 
     pub fn sync(&mut self, base: &mut Node<E, N>) {
         if self.version.is_derivative_of(&base.version) {
@@ -90,7 +90,7 @@ impl<E, N> Node<E, N> {
     pub fn get(&self) -> &N {
         &self.raw.data
     }
-    /// Clone the node
+    /// Clone the ``Node``
     /// 
     pub fn clone(&mut self) -> Self {
         Self {
