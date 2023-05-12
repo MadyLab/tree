@@ -5,7 +5,14 @@ use std::{
 
 use super::version::Version;
 
-/// Node handle
+/// A Node in Directed Acyclic Graph
+///
+/// Being cyclic would make all participated ``rawNode`` visible to other, which make clone meaningsless
+///
+/// First generic: Edge value
+///
+/// Second generic: Node value
+///
 #[derive(Debug)]
 pub struct Node<E, N> {
     version: Rc<Version<Edge<E, N>>>,
@@ -13,20 +20,52 @@ pub struct Node<E, N> {
 }
 
 impl<E, N> Node<E, N> {
+    /// construct new Node
+    ///
     pub fn new(data: N) -> Self {
         Self {
             version: Default::default(),
             raw: RawNode::new(data),
         }
     }
-    pub fn sync(&mut self,base:&mut Node<E,N>){
-        debug_assert!(self.version.is_derivative_of(&base.version));
-        self.version=base.version.clone();
+    /// Synchronize Node's ``Version`` with other
+    /// 
+    /// Also of note that the ``Version`` here is different from that of ``RawNode``,
+    /// so changing ``Node``'s ``Version`` won't change how the underlying graph.
+    /// 
+    pub fn sync(&mut self, base: &mut Node<E, N>) {
+        if self.version.is_derivative_of(&base.version) {
+            unsafe { self.extend_version(base) };
+        } else if base.version.is_derivative_of(&self.version) {
+            unsafe { base.extend_version(self) };
+        } else {
+            panic!("base's version might be a fork of self(and never merge)");
+        }
     }
+    /// Extend Node's ``Version`` to the future
+    /// 
+    /// Caller should ensure ``base`` is older than ``self``(not strictly).
+    ///
+    /// It's recommanded to call ``sync`` instead.
+    ///
+    pub unsafe fn extend_version(&mut self, base: &mut Node<E, N>) {
+        debug_assert!(self.version.is_derivative_of(&base.version));
+        self.version = base.version.clone();
+    }
+    /// Optimized the ``Node`` to speed up the process of finding its edge
+    /// 
+    /// Only need to call once, and returned all ``Node`` in both
+    ///  ``ParentsIterator`` and ``ChildrenIterator`` would be optimized.
+    /// 
     pub fn optimize(&mut self) {
         self.version = self.version.optimize();
     }
-    pub fn add_child(&mut self, child: &mut Node<E, N>, value: E){
+    /// Add child to the ``Node``
+    /// 
+    /// Also of note that the child's version won't be sync, to sync the child
+    /// , call ``add_child_sync`` instead
+    /// 
+    pub fn add_child(&mut self, child: &mut Node<E, N>, value: E) {
         self.version = Rc::new(child.version.merge(&self.version));
         let edge = Edge {
             data: Rc::new(value),
@@ -38,13 +77,21 @@ impl<E, N> Node<E, N> {
         self.raw.edges.borrow_mut().push(edge.clone());
         child.raw.edges.borrow_mut().push(edge);
     }
+    /// Add child and sync
+    /// 
+    /// See ``add_child`` and ``sync`` for further info.
+    /// 
     pub fn add_child_sync(&mut self, child: &mut Node<E, N>, value: E) {
         self.add_child(child, value);
-        child.sync(self);
+        unsafe { child.extend_version(self) };
     }
+    /// Get value of the ``Node``
+    /// 
     pub fn get(&self) -> &N {
         &self.raw.data
     }
+    /// Clone the node
+    /// 
     pub fn clone(&mut self) -> Self {
         Self {
             raw: Rc::new(RawNode {
