@@ -40,8 +40,8 @@ fn main() {
     let mut node2: Node<&str, &str> = Node::new("n2");
     let mut node3: Node<&str, &str> = Node::new("n3");
 
-    node1.add_child(&mut node2, "e1 2");
-    node1.add_child(&mut node3, "e1 3");
+    node1.add_child_sync(&mut node2, "e1 2");
+    node1.add_child_sync(&mut node3, "e1 3");
 
     node1.optimize();
     check_children!(node1, "e1 2", "n2");

@@ -19,12 +19,15 @@ impl<E, N> Node<E, N> {
             raw: RawNode::new(data),
         }
     }
-    pub fn optimize(&mut self){
-        self.version=self.version.optimize();
+    pub fn sync(&mut self,base:&mut Node<E,N>){
+        debug_assert!(self.version.is_derivative_of(&base.version));
+        self.version=base.version.clone();
     }
-    pub fn add_child(&mut self, child: &mut Node<E, N>, value: E) {
+    pub fn optimize(&mut self) {
+        self.version = self.version.optimize();
+    }
+    pub fn add_child(&mut self, child: &mut Node<E, N>, value: E){
         self.version = Rc::new(child.version.merge(&self.version));
-        child.version = self.version.clone();
         let edge = Edge {
             data: Rc::new(value),
             parent: self.raw.clone(),
@@ -34,6 +37,10 @@ impl<E, N> Node<E, N> {
         let edge = unsafe { child.version.migrate(edge) };
         self.raw.edges.borrow_mut().push(edge.clone());
         child.raw.edges.borrow_mut().push(edge);
+    }
+    pub fn add_child_sync(&mut self, child: &mut Node<E, N>, value: E) {
+        self.add_child(child, value);
+        child.sync(self);
     }
     pub fn get(&self) -> &N {
         &self.raw.data
